@@ -28,6 +28,12 @@ def _get_param_type(param: Union[inspect.Parameter, None]):
     return param.annotation
 
 
+def _wrap_one_param_func(func: Callable) -> Callable:
+    def wrapper(msg: Message, client: Client, token: str):
+        return func(token)
+    return wrapper
+
+
 async def _parse_user(_, client, token) -> User:
     if not (token.startswith("(met)") and token.endswith("(met)")):
         raise ValueError(f"wrong format: expected: '(met)`user_id`(met)', actual: {token}")
@@ -105,16 +111,25 @@ class Parser:
         decorator, register the func into object restricted _parse_funcs()
 
         checks if parse func for that type exists, and insert if not
-        :param func: parse func
+        :param func: parse func, which owns either (str) or (Message, Client, str) param types
         """
         s = inspect.signature(func)
 
-        # check: 1. not coroutine, 2. len matches
-        if asyncio.iscoroutinefunction(func):
-            raise TypeError('parse function should not be async')
-        if len(s.parameters) != 1 or list(s.parameters.values())[0].annotation != str:
-            raise TypeError('parse function should own only one param, and the param type is str')
+        params = list(s.parameters.values())
+        parse_func = None
+
+        # first type of function: (str)
+        if len(s.parameters) == 1 and params[0].annotation == str:
+            parse_func = _wrap_one_param_func(func)
+        # second type of function: (Message, Client, str)
+        elif len(s.parameters) == 3 \
+                and params[0].annotation == Message \
+                and params[1].annotation == Client \
+                and params[2].annotation == str:
+            parse_func = func
+        else:
+            raise TypeError('parse function should own either (str) or (Message, Client, str) param types')
 
         # insert, remember this is a replacement
-        self._parse_funcs[s.return_annotation] = func
+        self._parse_funcs[s.return_annotation] = parse_func
         return func
