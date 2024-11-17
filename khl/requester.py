@@ -16,10 +16,11 @@ API = 'https://www.kookapp.cn/api/v3'
 class HTTPRequester:
     """wrap raw requests, handle boilerplate param filling works"""
 
-    def __init__(self, cert: Cert, ratelimiter: Optional[RateLimiter]):
+    def __init__(self, cert: Cert, ratelimiter: Optional[RateLimiter], baseUrl: str = API):
         self._cert = cert
         self._cs: Union[ClientSession, None] = None
         self._ratelimiter = ratelimiter
+        self._baseUrl = baseUrl
 
     def __del__(self):
         if self._cs is not None:
@@ -38,7 +39,7 @@ class HTTPRequester:
         headers['Authorization'] = f'Bot {self._cert.token}'
         if self._cs is None:  # lazy init
             self._cs = ClientSession()
-        async with self._cs.request(method, f'{API}/{route}', **params) as res:
+        async with self._cs.request(method, f'{self._baseUrl}/{route}', **params) as res:
             if res.content_type == 'application/json':
                 rsp = await res.json()
                 if rsp['code'] != 0:

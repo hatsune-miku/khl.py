@@ -50,7 +50,8 @@ class Bot(AsyncRunnable):
                  compress: bool = True,
                  port=5000,
                  route='/khl-wh',
-                 ratelimiter: Optional[RateLimiter] = RateLimiter(start=80)):
+                 ratelimiter: Optional[RateLimiter] = RateLimiter(start=80),
+                 baseUrl: str = None):
         """
         The most common usage: ``Bot(token='xxxxxx')``
 
@@ -67,7 +68,7 @@ class Bot(AsyncRunnable):
         if not token and not cert:
             raise ValueError('require token or cert')
 
-        self._init_client(cert or Cert(token=token), client, gate, out, compress, port, route, ratelimiter)
+        self._init_client(cert or Cert(token=token), client, gate, out, compress, port, route, ratelimiter, baseUrl)
         self._register_client_handler()
 
         self.command = CommandManager()
@@ -80,7 +81,7 @@ class Bot(AsyncRunnable):
         self._shutdown_index = []
 
     def _init_client(self, cert: Cert, client: Client, gate: Gateway, out: HTTPRequester, compress: bool, port, route,
-                     ratelimiter):
+                     ratelimiter, baseUrl):
         """
         construct self.client from args.
 
@@ -104,7 +105,7 @@ class Bot(AsyncRunnable):
             return
 
         # client and gate not in args, build them
-        _out = out if out else HTTPRequester(cert, ratelimiter)
+        _out = out if out else HTTPRequester(cert, ratelimiter, baseUrl)
         if cert.type == Cert.Types.WEBSOCKET:
             _in = WebsocketReceiver(cert, compress)
         elif cert.type == Cert.Types.WEBHOOK:
