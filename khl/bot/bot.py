@@ -1,4 +1,5 @@
 """implementation of bot"""
+
 import asyncio
 import logging
 import warnings
@@ -6,7 +7,15 @@ from pathlib import Path
 from typing import Dict, Callable, List, Optional, Union, Coroutine, IO
 
 from .. import AsyncRunnable  # interfaces
-from .. import Cert, HTTPRequester, RateLimiter, WebhookReceiver, WebsocketReceiver, Gateway, Client  # net related
+from .. import (
+    Cert,
+    HTTPRequester,
+    RateLimiter,
+    WebhookReceiver,
+    WebsocketReceiver,
+    Gateway,
+    Client,
+)  # net related
 from .. import MessageTypes, EventTypes, SlowModeTypes, SoftwareTypes  # types
 from .. import User, Channel, PublicChannel, Guild, Event, Message  # concepts
 from ..command import CommandManager
@@ -15,16 +24,17 @@ from ..task import TaskManager
 
 log = logging.getLogger(__name__)
 
-TypeEventHandler = Callable[['Bot', Event], Coroutine]
+TypeEventHandler = Callable[["Bot", Event], Coroutine]
 TypeMessageHandler = Callable[[Message], Coroutine]
-TypeStartupHandler = Callable[['Bot'], Coroutine]
-TypeShutdownHandler = Callable[['Bot'], Coroutine]
+TypeStartupHandler = Callable[["Bot"], Coroutine]
+TypeShutdownHandler = Callable[["Bot"], Coroutine]
 
 
 class Bot(AsyncRunnable):
     """
     Represents a entity that handles msg/events and interact with users/khl server in manners that programmed.
     """
+
     # components
     client: Client
     command: CommandManager
@@ -40,18 +50,20 @@ class Bot(AsyncRunnable):
     _startup_index: List[TypeStartupHandler]
     _shutdown_index: List[TypeShutdownHandler]
 
-    def __init__(self,
-                 token: str = '',
-                 *,
-                 cert: Cert = None,
-                 client: Client = None,
-                 gate: Gateway = None,
-                 out: HTTPRequester = None,
-                 compress: bool = True,
-                 port=5000,
-                 route='/khl-wh',
-                 ratelimiter: Optional[RateLimiter] = RateLimiter(start=80),
-                 baseUrl: str = None):
+    def __init__(
+        self,
+        token: str = "",
+        *,
+        cert: Cert = None,
+        client: Client = None,
+        gate: Gateway = None,
+        out: HTTPRequester = None,
+        compress: bool = True,
+        port=5000,
+        route="/khl-wh",
+        ratelimiter: Optional[RateLimiter] = RateLimiter(start=80),
+        baseUrl: str = None,
+    ):
         """
         The most common usage: ``Bot(token='xxxxxx')``
 
@@ -66,9 +78,19 @@ class Bot(AsyncRunnable):
         :param route: used to tune the WebhookReceiver
         """
         if not token and not cert:
-            raise ValueError('require token or cert')
+            raise ValueError("require token or cert")
 
-        self._init_client(cert or Cert(token=token), client, gate, out, compress, port, route, ratelimiter, baseUrl)
+        self._init_client(
+            cert or Cert(token=token),
+            client,
+            gate,
+            out,
+            compress,
+            port,
+            route,
+            ratelimiter,
+            baseUrl,
+        )
         self._register_client_handler()
 
         self.command = CommandManager()
@@ -80,8 +102,18 @@ class Bot(AsyncRunnable):
         self._startup_index = []
         self._shutdown_index = []
 
-    def _init_client(self, cert: Cert, client: Client, gate: Gateway, out: HTTPRequester, compress: bool, port, route,
-                     ratelimiter, baseUrl):
+    def _init_client(
+        self,
+        cert: Cert,
+        client: Client,
+        gate: Gateway,
+        out: HTTPRequester,
+        compress: bool,
+        port,
+        route,
+        ratelimiter,
+        baseUrl,
+    ):
         """
         construct self.client from args.
 
@@ -107,11 +139,11 @@ class Bot(AsyncRunnable):
         # client and gate not in args, build them
         _out = out if out else HTTPRequester(cert, ratelimiter, baseUrl)
         if cert.type == Cert.Types.WEBSOCKET:
-            _in = WebsocketReceiver(cert, compress)
+            _in = WebsocketReceiver(cert, compress, baseUrl)
         elif cert.type == Cert.Types.WEBHOOK:
             _in = WebhookReceiver(cert, port=port, route=route, compress=compress)
         else:
-            raise ValueError(f'cert type: {cert.type} not supported')
+            raise ValueError(f"cert type: {cert.type} not supported")
 
         self.client = Client(Gateway(_out, _in))
 
@@ -130,7 +162,9 @@ class Bot(AsyncRunnable):
         """
 
         async def handler(msg: Message):
-            await self.command.handle(self.loop, self.client, msg, {Message: msg, Bot: self})
+            await self.command.handle(
+                self.loop, self.client, msg, {Message: msg, Bot: self}
+            )
 
         return handler
 
@@ -151,10 +185,12 @@ class Bot(AsyncRunnable):
         if type not in self._event_index:
             self._event_index[type] = []
         self._event_index[type].append(handler)
-        log.debug(f'event_handler {handler.__qualname__} for {type} added')
+        log.debug(f"event_handler {handler.__qualname__} for {type} added")
         return handler
 
-    def add_message_handler(self, handler: TypeMessageHandler, *except_type: MessageTypes):
+    def add_message_handler(
+        self, handler: TypeMessageHandler, *except_type: MessageTypes
+    ):
         """`except_type` is an exclusion list"""
         for type in MessageTypes:
             if type not in except_type:
@@ -175,7 +211,7 @@ class Bot(AsyncRunnable):
         """
 
         def dec(func: TypeMessageHandler):
-            self.add_message_handler(func, *set(except_type + (MessageTypes.SYS, )))
+            self.add_message_handler(func, *set(except_type + (MessageTypes.SYS,)))
 
         return dec
 
@@ -198,7 +234,11 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.fetch_me()`"""
-        warnings.warn("deprecated, alternative: bot.client.fetch_me()", DeprecationWarning, stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.fetch_me()",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self.client.fetch_me(force_update)
 
     @property
@@ -215,9 +255,11 @@ class Bot(AsyncRunnable):
         .. deprecated-removed:: 0.3.0 0.4.0
             use await :func:`.client.fetch_me()`
         """
-        warnings.warn("deprecated, alternative: bot.client.fetch_me(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.fetch_me(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.client.me
 
     async def fetch_public_channel(self, channel_id: str) -> PublicChannel:
@@ -226,9 +268,11 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.fetch_public_channel()`"""
-        warnings.warn("deprecated, alternative: bot.client.fetch_public_channel(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.fetch_public_channel(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self.client.fetch_public_channel(channel_id)
 
     async def fetch_user(self, user_id: str) -> User:
@@ -236,9 +280,11 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.fetch_user()`"""
-        warnings.warn("deprecated, alternative: bot.client.fetch_user(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.fetch_user(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self.client.fetch_user(user_id)
 
     async def delete_channel(self, channel: Union[Channel, str]):
@@ -246,9 +292,11 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.delete_channel()`"""
-        warnings.warn("deprecated, alternative: bot.client.delete_channel(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.delete_channel(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self.client.delete_channel(channel)
 
     async def fetch_guild(self, guild_id: str) -> Guild:
@@ -256,9 +304,11 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.fetch_guild()`"""
-        warnings.warn("deprecated, alternative: bot.client.fetch_guild(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.fetch_guild(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self.client.fetch_guild(guild_id)
 
     async def list_guild(self) -> List[Guild]:
@@ -267,18 +317,22 @@ class Bot(AsyncRunnable):
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.fetch_guild_list()`
         """
-        warnings.warn("deprecated, alternative: bot.client.fetch_guild_list(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.fetch_guild_list(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self.client.fetch_guild_list()
 
-    async def send(self,
-                   target: Channel,
-                   content: Union[str, List],
-                   *,
-                   type: MessageTypes = None,
-                   temp_target_id: str = '',
-                   **kwargs):
+    async def send(
+        self,
+        target: Channel,
+        content: Union[str, List],
+        *,
+        type: MessageTypes = None,
+        temp_target_id: str = "",
+        **kwargs,
+    ):
         """
         send a msg to a channel
 
@@ -286,10 +340,14 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.send()`"""
-        warnings.warn("deprecated, alternative: bot.client.send(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
-        return await self.client.send(target, content, type=type, temp_target_id=temp_target_id, **kwargs)
+        warnings.warn(
+            "deprecated, alternative: bot.client.send(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return await self.client.send(
+            target, content, type=type, temp_target_id=temp_target_id, **kwargs
+        )
 
     async def upload_asset(self, file: Union[IO, str, Path]) -> str:
         """upload ``file`` to khl, and return the url to the file, alias for ``create_asset``
@@ -298,9 +356,11 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.create_asset()`"""
-        warnings.warn("deprecated, alternative: bot.client.create_asset(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.create_asset(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self.create_asset(file)
 
     async def create_asset(self, file: Union[IO, str, Path]) -> str:
@@ -310,9 +370,11 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.create_asset()`"""
-        warnings.warn("deprecated, alternative: bot.client.create_asset(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.create_asset(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self.client.create_asset(file)
 
     async def kickout(self, guild: Union[Guild, str], user: Union[User, str]):
@@ -320,9 +382,11 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.kickout()`"""
-        warnings.warn("deprecated, alternative: bot.client.kickout(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.kickout(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self.client.kickout(guild, user)
 
     async def leave(self, guild: Union[Guild, str]):
@@ -330,9 +394,11 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.leave()`"""
-        warnings.warn("deprecated, alternative: bot.client.leave(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.leave(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self.client.leave(guild)
 
     async def add_reaction(self, msg: Message, emoji: str):
@@ -346,9 +412,11 @@ class Bot(AsyncRunnable):
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.add_reaction()`
         """
-        warnings.warn("deprecated, alternative: bot.client.add_reaction(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.add_reaction(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self.client.add_reaction(msg, emoji)
 
     async def delete_reaction(self, msg: Message, emoji: str, user: User = None):
@@ -363,37 +431,46 @@ class Bot(AsyncRunnable):
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.delete_reaction()`
         """
-        warnings.warn("deprecated, alternative: bot.client.delete_reaction(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.delete_reaction(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self.client.delete_reaction(msg, emoji, user)
 
-    async def list_game(self,
-                        *,
-                        begin_page: int = 1,
-                        end_page: int = None,
-                        page_size: int = 50,
-                        sort: str = '') -> List[Game]:
+    async def list_game(
+        self,
+        *,
+        begin_page: int = 1,
+        end_page: int = None,
+        page_size: int = 50,
+        sort: str = "",
+    ) -> List[Game]:
         """list the games already registered at khl server
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.fetch_game_list()`"""
-        warnings.warn("deprecated, alternative: bot.client.fetch_game_list(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
-        return await self.client.fetch_game_list(begin_page=begin_page,
-                                                 end_page=end_page,
-                                                 page_size=page_size,
-                                                 sort=sort)
+        warnings.warn(
+            "deprecated, alternative: bot.client.fetch_game_list(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return await self.client.fetch_game_list(
+            begin_page=begin_page, end_page=end_page, page_size=page_size, sort=sort
+        )
 
-    async def create_game(self, name: str, process_name: str = None, icon: str = None) -> Game:
+    async def create_game(
+        self, name: str, process_name: str = None, icon: str = None
+    ) -> Game:
         """register a new game at khl server, can be used in profile status
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.register_game()`"""
-        warnings.warn("deprecated, alternative: bot.client.register_game(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.register_game(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self.client.register_game(name, process_name, icon)
 
     async def update_game(self, id: int, name: str = None, icon: str = None) -> Game:
@@ -401,9 +478,11 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.update_game()`"""
-        warnings.warn("deprecated, alternative: bot.client.update_game(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.update_game(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return await self.client.update_game(id, name, icon)
 
     async def delete_game(self, game: Union[Game, int]):
@@ -413,9 +492,11 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.unregister_game()`"""
-        warnings.warn("deprecated, alternative: bot.client.unregister_game(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.unregister_game(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         await self.client.unregister_game(game)
 
     async def update_playing_game(self, game: Union[Game, int]):
@@ -425,9 +506,11 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.update_playing_game()`"""
-        warnings.warn("deprecated, alternative: bot.client.update_playing_game(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.update_playing_game(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         await self.client.update_playing_game(game)
 
     async def stop_playing_game(self):
@@ -435,12 +518,16 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.stop_playing_game()`"""
-        warnings.warn("deprecated, alternative: bot.client.stop_playing_game(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.stop_playing_game(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         await self.client.stop_playing_game()
 
-    async def update_listening_music(self, music_name: str, singer: str, software: Union[str, SoftwareTypes]):
+    async def update_listening_music(
+        self, music_name: str, singer: str, software: Union[str, SoftwareTypes]
+    ):
         """update current listening music status
 
         :param music_name: name of music
@@ -449,9 +536,11 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.update_listening_music()`"""
-        warnings.warn("deprecated, alternative: bot.client.update_listening_music(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.update_listening_music(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         await self.client.update_listening_music(music_name, singer, software)
 
     async def stop_listening_music(self):
@@ -459,30 +548,36 @@ class Bot(AsyncRunnable):
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.stop_listening_music()`"""
-        warnings.warn("deprecated, alternative: bot.client.stop_listening_music(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.stop_listening_music(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         await self.client.stop_listening_music()
 
-    async def update_channel(self,
-                             channel: Union[str, PublicChannel],
-                             name: str = None,
-                             topic: str = None,
-                             slow_mode: Union[int, SlowModeTypes] = None):
+    async def update_channel(
+        self,
+        channel: Union[str, PublicChannel],
+        name: str = None,
+        topic: str = None,
+        slow_mode: Union[int, SlowModeTypes] = None,
+    ):
         """update channel's settings
 
         .. deprecated-removed:: 0.3.0 0.4.0
             use :func:`.client.update_channel()`"""
-        warnings.warn("deprecated, alternative: bot.client.update_channel(), everything else is in the same",
-                      DeprecationWarning,
-                      stacklevel=2)
+        warnings.warn(
+            "deprecated, alternative: bot.client.update_channel(), everything else is in the same",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         await self.client.update_channel(channel, name, topic, slow_mode)
 
     async def start(self):
         for func in self._startup_index:
             await func(self)
         if self._is_running:
-            raise RuntimeError('this bot is already running')
+            raise RuntimeError("this bot is already running")
         self.task.schedule()
         await self.client.start()
 
@@ -495,4 +590,4 @@ class Bot(AsyncRunnable):
         except KeyboardInterrupt:
             for func in self._shutdown_index:
                 self.loop.run_until_complete(func(self))
-            log.info('see you next time')
+            log.info("see you next time")
